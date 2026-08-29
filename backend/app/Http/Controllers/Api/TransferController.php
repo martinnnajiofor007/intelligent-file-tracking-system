@@ -53,6 +53,25 @@ class TransferController extends Controller
         ]);
     }
 
+    public function overdue(Request $request): JsonResponse
+    {
+        $transfers = Transfer::query()
+            ->overdue()
+            ->with($this->relations())
+            ->orderByDesc('due_at')
+            ->paginate($this->perPage($request));
+
+        return response()->json([
+            'data' => $transfers->getCollection()->map(fn (Transfer $transfer) => $this->serializeTransfer($transfer))->values(),
+            'meta' => [
+                'current_page' => $transfers->currentPage(),
+                'per_page' => $transfers->perPage(),
+                'total' => $transfers->total(),
+                'last_page' => $transfers->lastPage(),
+            ],
+        ]);
+    }
+
     public function acknowledge(Request $request, Transfer $transfer): JsonResponse
     {
         if (! $this->transfers->canActOn($request->user(), $transfer)) {
@@ -103,6 +122,11 @@ class TransferController extends Controller
             'acknowledgedBy',
             'rejectedBy',
         ];
+    }
+
+    private function perPage(Request $request): int
+    {
+        return max(1, min((int) $request->input('per_page', 15), 100));
     }
 
     private function serializeTransfer(Transfer $transfer): array

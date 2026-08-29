@@ -96,4 +96,11 @@ class Transfer extends Model
             && $this->due_at !== null
             && $this->due_at->isPast();
     }
+
+    public function scopeOverdue($query)
+    {
+        return $query->where('status', self::STATUS_PENDING)
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now());
+    }
 }

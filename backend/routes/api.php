@@ -50,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/files/{file}/transfers', [TransferController::class, 'index']);
     Route::post('/transfers', [TransferController::class, 'store']);
+    Route::get('/transfers/overdue', [TransferController::class, 'overdue']);
     Route::get('/transfers/{transfer}', [TransferController::class, 'show']);
     Route::post('/transfers/{transfer}/acknowledge', [TransferController::class, 'acknowledge']);
     Route::post('/transfers/{transfer}/reject', [TransferController::class, 'reject']);
