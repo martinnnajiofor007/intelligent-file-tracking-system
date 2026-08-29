@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FileCategoryController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\FileIssueController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\TransferController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Http\JsonResponse;
@@ -62,4 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/files/{file}/audit-logs', [AuditLogController::class, 'fileAuditLogs']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show']);
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
 });

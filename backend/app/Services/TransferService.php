@@ -6,13 +6,16 @@ use App\Models\File;
 use App\Models\Transfer;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class TransferService
 {
-    public function __construct(private AuditLogService $audit)
-    {
+    public function __construct(
+        private AuditLogService $audit,
+        private NotificationService $notifications
+    ) {
     }
     /**
      * Create a pending transfer. Confirmed custody is never modified here.
@@ -63,6 +66,8 @@ class TransferService
                 $transfer
             );
 
+            $this->notifications->notifyTransferCreated($transfer);
+
             return $transfer;
         });
     }
@@ -105,6 +110,8 @@ class TransferService
                 ['status' => Transfer::STATUS_PENDING],
                 $transfer->fresh()
             );
+
+            $this->notifications->notifyTransferAcknowledged($transfer->fresh());
 
             return true;
         });
@@ -149,6 +156,8 @@ class TransferService
                 ['status' => Transfer::STATUS_PENDING],
                 $transfer->fresh()
             );
+
+            $this->notifications->notifyTransferRejected($transfer->fresh());
 
             return true;
         });

@@ -62,6 +62,11 @@ class User extends Authenticatable
         return $this->hasMany(File::class, 'confirmed_holder_user_id');
     }
 
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class)->orderByDesc('created_at');
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

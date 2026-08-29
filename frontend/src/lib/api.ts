@@ -64,6 +64,20 @@ export type AuditLog = {
   updated_at: string;
 };
 
+export type Notification = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  related_type: string | null;
+  related_id: number | null;
+  metadata: Record<string, unknown> | null;
+  read_at: string | null;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api";
 
@@ -215,6 +229,54 @@ export async function getFileAuditLogs(token: string, fileId: string) {
   });
 
   return parseResponse<PaginatedResponse<AuditLog>>(response);
+}
+
+export async function getNotifications(
+  token: string,
+  filters: { unread?: boolean; per_page?: number } = {},
+) {
+  const params = new URLSearchParams();
+
+  if (filters.unread !== undefined) {
+    params.set("unread", String(filters.unread));
+  }
+  if (filters.per_page !== undefined) {
+    params.set("per_page", String(filters.per_page));
+  }
+
+  const response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<PaginatedResponse<Notification>>(response);
+}
+
+export async function getNotification(token: string, id: number) {
+  const response = await fetch(`${API_BASE_URL}/notifications/${id}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<{ data: Notification }>(response);
+}
+
+export async function markNotificationAsRead(token: string, id: number) {
+  const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<{ data: Notification }>(response);
+}
+
+export async function markAllNotificationsAsRead(token: string) {
+  const response = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<{ data: { updated: number } }>(response);
 }
 
 export async function createFile(

@@ -6,12 +6,15 @@ use App\Models\File;
 use App\Models\FileIssue;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\NotificationService;
 use InvalidArgumentException;
 
 class FileIssueService
 {
-    public function __construct(private AuditLogService $audit)
-    {
+    public function __construct(
+        private AuditLogService $audit,
+        private NotificationService $notifications
+    ) {
     }
     /**
      * Report a new issue against a file. The reporter is always the actor.
@@ -34,6 +37,8 @@ class FileIssueService
             null,
             $issue
         );
+
+        $this->notifications->notifyIssueReported($issue);
 
         return $issue;
     }
@@ -96,6 +101,8 @@ class FileIssueService
                 $after
             );
         }
+
+        $this->notifications->notifyIssueStatusChanged($issue->fresh(), $newStatus);
 
         return $issue->fresh();
     }

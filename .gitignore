@@ -36,3 +36,4 @@ Thumbs.db
 # Local agent/tool artifacts
 frontend/AGENTS.md
 frontend/CLAUDE.md
+.abacusai/
