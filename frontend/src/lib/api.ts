@@ -52,6 +52,18 @@ export type PaginatedResponse<T> = {
 
 export type ValidationErrors = Record<string, string[]>;
 
+export type AuditLog = {
+  id: number;
+  actor: Pick<User, "id" | "name" | "email"> | null;
+  action: string;
+  entity_type: string;
+  entity_id: number;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api";
 
@@ -167,6 +179,42 @@ export async function getFile(token: string, id: string) {
   });
 
   return parseResponse<{ data: PhysicalFile }>(response);
+}
+
+export async function getAuditLogs(
+  token: string,
+  filters: {
+    actor_user_id?: string;
+    action?: string;
+    entity_type?: string;
+    entity_id?: string;
+    from?: string;
+    to?: string;
+  } = {},
+) {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) {
+      params.set(key, value);
+    }
+  });
+
+  const response = await fetch(`${API_BASE_URL}/audit-logs?${params.toString()}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<PaginatedResponse<AuditLog>>(response);
+}
+
+export async function getFileAuditLogs(token: string, fileId: string) {
+  const response = await fetch(`${API_BASE_URL}/files/${fileId}/audit-logs`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<PaginatedResponse<AuditLog>>(response);
 }
 
 export async function createFile(

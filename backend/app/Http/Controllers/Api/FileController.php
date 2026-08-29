@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreFileRequest;
-use App\Models\AuditLog;
 use App\Models\File;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class FileController extends Controller
 {
+    public function __construct(private AuditLogService $audit)
+    {
+    }
     public function index(Request $request): JsonResponse
     {
         $files = File::query()
@@ -49,13 +52,14 @@ class FileController extends Controller
             'registered_at' => now(),
         ]))->load(['category', 'confirmedDepartment', 'confirmedHolder', 'registeredBy']);
 
-        AuditLog::create([
-            'actor_user_id' => $request->user()->id,
-            'action' => 'file_registered',
-            'entity_type' => File::class,
-            'entity_id' => $file->id,
-            'after' => $file->toArray(),
-        ]);
+        $this->audit->record(
+            $request->user(),
+            'file_registered',
+            File::class,
+            $file->id,
+            null,
+            $file
+        );
 
         return response()->json([
             'data' => $this->serializeFile($file),

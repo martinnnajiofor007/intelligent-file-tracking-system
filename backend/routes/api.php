@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FileCategoryController;
 use App\Http\Controllers\Api\FileController;
@@ -57,4 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/files/{file}/issues', [FileIssueController::class, 'store']);
     Route::get('/issues/{issue}', [FileIssueController::class, 'show']);
     Route::patch('/issues/{issue}', [FileIssueController::class, 'update']);
+
+    Route::get('/audit-logs', [AuditLogController::class, 'index']);
+    Route::get('/files/{file}/audit-logs', [AuditLogController::class, 'fileAuditLogs']);
 });

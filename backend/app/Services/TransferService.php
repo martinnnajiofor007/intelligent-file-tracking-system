@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
-use App\Models\AuditLog;
 use App\Models\File;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class TransferService
 {
+    public function __construct(private AuditLogService $audit)
+    {
+    }
     /**
      * Create a pending transfer. Confirmed custody is never modified here.
      *
@@ -51,13 +54,14 @@ class TransferService
                 'due_at' => $dueAt,
             ]);
 
-            AuditLog::create([
-                'actor_user_id' => $actor->id,
-                'action' => 'transfer_created',
-                'entity_type' => Transfer::class,
-                'entity_id' => $transfer->id,
-                'after' => $transfer->toArray(),
-            ]);
+            $this->audit->record(
+                $actor,
+                'transfer_created',
+                Transfer::class,
+                $transfer->id,
+                null,
+                $transfer
+            );
 
             return $transfer;
         });
@@ -93,14 +97,14 @@ class TransferService
                 'confirmed_holder_user_id' => $transfer->to_holder_user_id,
             ]);
 
-            AuditLog::create([
-                'actor_user_id' => $actor->id,
-                'action' => 'transfer_acknowledged',
-                'entity_type' => Transfer::class,
-                'entity_id' => $transfer->id,
-                'before' => ['status' => Transfer::STATUS_PENDING],
-                'after' => $transfer->fresh()->toArray(),
-            ]);
+            $this->audit->record(
+                $actor,
+                'transfer_acknowledged',
+                Transfer::class,
+                $transfer->id,
+                ['status' => Transfer::STATUS_PENDING],
+                $transfer->fresh()
+            );
 
             return true;
         });
@@ -137,14 +141,14 @@ class TransferService
                 return false;
             }
 
-            AuditLog::create([
-                'actor_user_id' => $actor->id,
-                'action' => 'transfer_rejected',
-                'entity_type' => Transfer::class,
-                'entity_id' => $transfer->id,
-                'before' => ['status' => Transfer::STATUS_PENDING],
-                'after' => $transfer->fresh()->toArray(),
-            ]);
+            $this->audit->record(
+                $actor,
+                'transfer_rejected',
+                Transfer::class,
+                $transfer->id,
+                ['status' => Transfer::STATUS_PENDING],
+                $transfer->fresh()
+            );
 
             return true;
         });

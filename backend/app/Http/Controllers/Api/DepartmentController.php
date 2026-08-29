@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDepartmentRequest;
-use App\Models\AuditLog;
 use App\Models\Department;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 
 class DepartmentController extends Controller
 {
+    public function __construct(private AuditLogService $audit)
+    {
+    }
     public function index(): JsonResponse
     {
         $departments = Department::with('parent')
@@ -26,13 +29,14 @@ class DepartmentController extends Controller
 
         $department = Department::create($request->validated())->load('parent');
 
-        AuditLog::create([
-            'actor_user_id' => $request->user()->id,
-            'action' => 'department_created',
-            'entity_type' => Department::class,
-            'entity_id' => $department->id,
-            'after' => $department->toArray(),
-        ]);
+        $this->audit->record(
+            $request->user(),
+            'department_created',
+            Department::class,
+            $department->id,
+            null,
+            $department
+        );
 
         return response()->json([
             'data' => $this->serializeDepartment($department),

@@ -2,14 +2,17 @@
 
 namespace App\Services;
 
-use App\Models\AuditLog;
 use App\Models\File;
 use App\Models\FileIssue;
 use App\Models\User;
+use App\Services\AuditLogService;
 use InvalidArgumentException;
 
 class FileIssueService
 {
+    public function __construct(private AuditLogService $audit)
+    {
+    }
     /**
      * Report a new issue against a file. The reporter is always the actor.
      */
@@ -23,13 +26,14 @@ class FileIssueService
             'reported_by_user_id' => $actor->id,
         ]);
 
-        AuditLog::create([
-            'actor_user_id' => $actor->id,
-            'action' => 'issue_created',
-            'entity_type' => FileIssue::class,
-            'entity_id' => $issue->id,
-            'after' => $issue->toArray(),
-        ]);
+        $this->audit->record(
+            $actor,
+            'issue_created',
+            FileIssue::class,
+            $issue->id,
+            null,
+            $issue
+        );
 
         return $issue;
     }
@@ -64,33 +68,33 @@ class FileIssueService
 
         $after = $issue->fresh()->toArray();
 
-        AuditLog::create([
-            'actor_user_id' => $actor->id,
-            'action' => 'issue_status_changed',
-            'entity_type' => FileIssue::class,
-            'entity_id' => $issue->id,
-            'before' => $before,
-            'after' => $after,
-        ]);
+        $this->audit->record(
+            $actor,
+            'issue_status_changed',
+            FileIssue::class,
+            $issue->id,
+            $before,
+            $after
+        );
 
         if ($newStatus === FileIssue::STATUS_RESOLVED) {
-            AuditLog::create([
-                'actor_user_id' => $actor->id,
-                'action' => 'issue_resolved',
-                'entity_type' => FileIssue::class,
-                'entity_id' => $issue->id,
-                'before' => $before,
-                'after' => $after,
-            ]);
+            $this->audit->record(
+                $actor,
+                'issue_resolved',
+                FileIssue::class,
+                $issue->id,
+                $before,
+                $after
+            );
         } elseif ($newStatus === FileIssue::STATUS_DISMISSED) {
-            AuditLog::create([
-                'actor_user_id' => $actor->id,
-                'action' => 'issue_dismissed',
-                'entity_type' => FileIssue::class,
-                'entity_id' => $issue->id,
-                'before' => $before,
-                'after' => $after,
-            ]);
+            $this->audit->record(
+                $actor,
+                'issue_dismissed',
+                FileIssue::class,
+                $issue->id,
+                $before,
+                $after
+            );
         }
 
         return $issue->fresh();
