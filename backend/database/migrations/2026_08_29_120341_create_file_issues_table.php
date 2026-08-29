@@ -10,11 +10,11 @@ return new class extends Migration
     {
         Schema::create('file_issues', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('file_id')->constrained('files')->cascadeOnDelete();
+            $table->foreignId('file_id')->constrained('files')->restrictOnDelete();
             $table->string('issue_type');
             $table->text('description');
             $table->string('status')->default('open');
-            $table->foreignId('reported_by_user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('reported_by_user_id')->constrained('users')->restrictOnDelete();
             $table->foreignId('resolved_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();

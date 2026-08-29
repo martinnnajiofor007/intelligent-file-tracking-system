@@ -55,6 +55,11 @@ class File extends Model
         return $this->hasMany(Transfer::class);
     }
 
+    public function issues(): HasMany
+    {
+        return $this->hasMany(FileIssue::class);
+    }
+
     public function pendingTransfer(): HasOne
     {
         return $this->hasOne(Transfer::class)

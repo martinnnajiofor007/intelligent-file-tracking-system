@@ -36,5 +36,9 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('create-transfers', function ($user) {
             return in_array($user->role, ['admin', 'registry_staff', 'supervisor'], true);
         });
+
+        Gate::define('manage-issues', function ($user) {
+            return in_array($user->role, ['admin', 'registry_staff', 'supervisor'], true);
+        });
     }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\FileCategoryController;
 use App\Http\Controllers\Api\FileController;
+use App\Http\Controllers\Api\FileIssueController;
 use App\Http\Controllers\Api\TransferController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Http\JsonResponse;
@@ -51,4 +52,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transfers/{transfer}', [TransferController::class, 'show']);
     Route::post('/transfers/{transfer}/acknowledge', [TransferController::class, 'acknowledge']);
     Route::post('/transfers/{transfer}/reject', [TransferController::class, 'reject']);
+
+    Route::get('/files/{file}/issues', [FileIssueController::class, 'index']);
+    Route::post('/files/{file}/issues', [FileIssueController::class, 'store']);
+    Route::get('/issues/{issue}', [FileIssueController::class, 'show']);
+    Route::patch('/issues/{issue}', [FileIssueController::class, 'update']);
 });
