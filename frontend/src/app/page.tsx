@@ -1,4 +1,5 @@
 import { BackendHealthCard } from "@/components/BackendHealthCard";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -12,8 +13,23 @@ export default function Home() {
             Intelligent File Tracking System
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            Project foundation shell for the Laravel API and Next.js frontend.
+            Phase 1 foundation for registering physical files and assigning
+            their initial confirmed custodians.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/login"
+              className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+            >
+              Login
+            </Link>
+            <Link
+              href="/files"
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+            >
+              Files
+            </Link>
+          </div>
         </header>
 
         <BackendHealthCard />

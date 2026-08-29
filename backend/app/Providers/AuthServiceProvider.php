@@ -25,6 +25,16 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        Gate::define('manage-organization-data', function ($user) {
+            return $user->role === 'admin';
+        });
+
+        Gate::define('register-files', function ($user) {
+            return in_array($user->role, ['admin', 'registry_staff'], true);
+        });
+
+        Gate::define('create-transfers', function ($user) {
+            return in_array($user->role, ['admin', 'registry_staff', 'supervisor'], true);
+        });
     }
 }
