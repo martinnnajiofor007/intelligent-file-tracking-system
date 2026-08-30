@@ -7,6 +7,7 @@ use App\Models\Transfer;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -41,9 +42,11 @@ class TransferService
                 throw new InvalidArgumentException('The destination is the same as the current confirmed custodian.');
             }
 
-            $dueAt = $lockedFile->category?->default_due_days
-                ? now()->addDays($lockedFile->category->default_due_days)
-                : null;
+            $dueAt = isset($data['due_at']) && $data['due_at'] !== null
+                ? Carbon::parse($data['due_at'])
+                : ($lockedFile->category?->default_due_days
+                    ? now()->addDays($lockedFile->category->default_due_days)
+                    : null);
 
             $transfer = Transfer::create([
                 'file_id' => $lockedFile->id,

@@ -126,4 +126,62 @@ class FileApiTest extends TestCase
                 ],
             ]);
     }
+
+    public function test_file_list_caps_per_page_at_100(): void
+    {
+        File::factory()->count(3)->create();
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson('/api/files?per_page=999999')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', 100);
+    }
+
+    // ---------- Status filter validation ----------
+
+    public function test_valid_status_filter_is_accepted(): void
+    {
+        File::factory()->create(['file_number' => 'FIN/2026/002', 'status' => File::STATUS_ACTIVE]);
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson('/api/files?status=active')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', File::STATUS_ACTIVE);
+    }
+
+    public function test_invalid_status_filter_is_rejected(): void
+    {
+        File::factory()->create();
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson('/api/files?status=HACKED')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_invalid_status_filter_does_not_return_empty_200(): void
+    {
+        File::factory()->create();
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $response = $this->getJson('/api/files?status=HACKED');
+
+        $response->assertStatus(422);
+        $this->assertNotEquals(200, $response->getStatusCode());
+    }
+
+    public function test_omitted_status_filter_returns_all_files(): void
+    {
+        File::factory()->count(3)->create();
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson('/api/files')
+            ->assertOk()
+            ->assertJsonCount(3, 'data');
+    }
 }

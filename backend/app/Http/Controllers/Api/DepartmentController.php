@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDepartmentRequest;
+use App\Http\Requests\UpdateDepartmentRequest;
 use App\Models\Department;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +42,32 @@ class DepartmentController extends Controller
         return response()->json([
             'data' => $this->serializeDepartment($department),
         ], 201);
+    }
+
+    public function update(UpdateDepartmentRequest $request, Department $department): JsonResponse
+    {
+        $before = [
+            'name' => $department->name,
+            'parent_id' => $department->parent_id,
+        ];
+
+        $department->update($request->validated());
+
+        $this->audit->record(
+            $request->user(),
+            'department_updated',
+            Department::class,
+            $department->id,
+            $before,
+            [
+                'name' => $department->name,
+                'parent_id' => $department->parent_id,
+            ]
+        );
+
+        return response()->json([
+            'data' => $this->serializeDepartment($department->load('parent')),
+        ]);
     }
 
     private function serializeDepartment(Department $department): array

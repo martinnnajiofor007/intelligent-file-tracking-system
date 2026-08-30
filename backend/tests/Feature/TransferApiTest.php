@@ -143,6 +143,62 @@ class TransferApiTest extends TestCase
         );
     }
 
+    public function test_creating_a_transfer_accepts_client_provided_due_at(): void
+    {
+        $file = $this->makeFile();
+        $destination = $this->makeDestination();
+        $dueAt = now()->addDays(3);
+
+        Sanctum::actingAs(User::factory()->registryStaff()->create());
+
+        $this->postJson('/api/transfers', [
+            'file_id' => $file->id,
+            'to_department_id' => $destination['department']->id,
+            'to_holder_user_id' => $destination['holder']->id,
+            'due_at' => $dueAt->toISOString(),
+        ])->assertCreated();
+
+        $transfer = Transfer::first();
+        $this->assertNotNull($transfer->due_at);
+        $this->assertEqualsWithDelta($dueAt->timestamp, $transfer->due_at->timestamp, 5);
+    }
+
+    public function test_creating_a_transfer_with_past_due_at_is_overdue(): void
+    {
+        $file = $this->makeFile();
+        $destination = $this->makeDestination();
+
+        Sanctum::actingAs(User::factory()->registryStaff()->create());
+
+        $this->postJson('/api/transfers', [
+            'file_id' => $file->id,
+            'to_department_id' => $destination['department']->id,
+            'to_holder_user_id' => $destination['holder']->id,
+            'due_at' => now()->subDay()->toISOString(),
+        ])->assertCreated();
+
+        $transfer = Transfer::first();
+        $this->assertTrue($transfer->isOverdue());
+    }
+
+    public function test_creating_a_transfer_with_invalid_due_at_is_rejected(): void
+    {
+        $file = $this->makeFile();
+        $destination = $this->makeDestination();
+
+        Sanctum::actingAs(User::factory()->registryStaff()->create());
+
+        $this->postJson('/api/transfers', [
+            'file_id' => $file->id,
+            'to_department_id' => $destination['department']->id,
+            'to_holder_user_id' => $destination['holder']->id,
+            'due_at' => 'not-a-date',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('due_at');
+
+        $this->assertDatabaseCount('transfers', 0);
+    }
+
     public function test_creating_a_transfer_logs_an_audit_entry(): void
     {
         $file = $this->makeFile();
@@ -635,7 +691,6 @@ class TransferApiTest extends TestCase
             'status' => Transfer::STATUS_ACKNOWLEDGED,
             'acknowledged_by_user_id' => $otherUser->id,
             'acknowledged_at' => now()->toISOString(),
-            'due_at' => now()->addYear()->toISOString(),
         ])->assertCreated();
 
         $transfer = Transfer::first();

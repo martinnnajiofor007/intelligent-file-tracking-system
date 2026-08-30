@@ -31,16 +31,22 @@ Route::get('/health', function (): JsonResponse {
     ]);
 });
 
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
 
     Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::patch('/users/{user}', [UserController::class, 'update']);
+    Route::patch('/users/{user}/password', [UserController::class, 'resetPassword']);
 
     Route::get('/departments', [DepartmentController::class, 'index']);
     Route::post('/departments', [DepartmentController::class, 'store']);
+    Route::patch('/departments/{department}', [DepartmentController::class, 'update']);
 
     Route::get('/file-categories', [FileCategoryController::class, 'index']);
     Route::post('/file-categories', [FileCategoryController::class, 'store']);
@@ -50,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/files/{file}', [FileController::class, 'show']);
 
     Route::get('/files/{file}/transfers', [TransferController::class, 'index']);
+    Route::get('/transfers', [TransferController::class, 'indexAll']);
     Route::post('/transfers', [TransferController::class, 'store']);
     Route::get('/transfers/overdue', [TransferController::class, 'overdue']);
     Route::get('/transfers/{transfer}', [TransferController::class, 'show']);
@@ -58,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/files/{file}/issues', [FileIssueController::class, 'index']);
     Route::post('/files/{file}/issues', [FileIssueController::class, 'store']);
+    Route::get('/issues', [FileIssueController::class, 'indexAll']);
     Route::get('/issues/{issue}', [FileIssueController::class, 'show']);
     Route::patch('/issues/{issue}', [FileIssueController::class, 'update']);
 

@@ -25,6 +25,7 @@ class StoreTransferRequest extends FormRequest
                         ->where('department_id', $this->input('to_department_id'));
                 }),
             ],
+            'due_at' => ['nullable', 'date'],
         ];
     }
 }

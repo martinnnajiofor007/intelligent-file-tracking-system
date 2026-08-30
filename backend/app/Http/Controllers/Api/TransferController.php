@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IndexTransferRequest;
 use App\Http\Requests\StoreTransferRequest;
 use App\Models\File;
 use App\Models\Transfer;
@@ -59,6 +60,37 @@ class TransferController extends Controller
             ->overdue()
             ->with($this->relations())
             ->orderByDesc('due_at')
+            ->paginate($this->perPage($request));
+
+        return response()->json([
+            'data' => $transfers->getCollection()->map(fn (Transfer $transfer) => $this->serializeTransfer($transfer))->values(),
+            'meta' => [
+                'current_page' => $transfers->currentPage(),
+                'per_page' => $transfers->perPage(),
+                'total' => $transfers->total(),
+                'last_page' => $transfers->lastPage(),
+            ],
+        ]);
+    }
+
+    public function indexAll(IndexTransferRequest $request): JsonResponse
+    {
+        $transfers = Transfer::query()
+            ->with($this->relations())
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->input('status')))
+            ->when($request->filled('overdue'), function ($query) use ($request) {
+                if ($request->boolean('overdue')) {
+                    $query->overdue();
+                }
+            })
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->input('search');
+                $query->whereHas('file', function ($fileQuery) use ($search) {
+                    $fileQuery->where('file_number', 'like', "%{$search}%")
+                        ->orWhere('title', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('requested_at')
             ->paginate($this->perPage($request));
 
         return response()->json([

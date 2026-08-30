@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IndexFileRequest;
 use App\Http\Requests\StoreFileRequest;
 use App\Models\File;
 use App\Services\AuditLogService;
@@ -14,7 +15,7 @@ class FileController extends Controller
     public function __construct(private AuditLogService $audit)
     {
     }
-    public function index(Request $request): JsonResponse
+    public function index(IndexFileRequest $request): JsonResponse
     {
         $files = File::query()
             ->with(['category', 'confirmedDepartment', 'confirmedHolder', 'registeredBy'])
@@ -29,7 +30,7 @@ class FileController extends Controller
             ->when($request->filled('department_id'), fn ($query) => $query->where('confirmed_department_id', $request->input('department_id')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->input('status')))
             ->orderByDesc('registered_at')
-            ->paginate((int) $request->input('per_page', 15));
+            ->paginate($this->perPage($request));
 
         return response()->json([
             'data' => $files->getCollection()->map(fn (File $file) => $this->serializeFile($file))->values(),
@@ -73,6 +74,11 @@ class FileController extends Controller
         return response()->json([
             'data' => $this->serializeFile($file),
         ]);
+    }
+
+    private function perPage(Request $request): int
+    {
+        return max(1, min((int) $request->input('per_page', 15), 100));
     }
 
     private function serializeFile(File $file): array

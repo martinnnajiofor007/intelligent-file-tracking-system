@@ -29,6 +29,10 @@ class AuthServiceProvider extends ServiceProvider
             return $user->role === 'admin';
         });
 
+        Gate::define('manage-users', function ($user) {
+            return $user->role === 'admin';
+        });
+
         Gate::define('register-files', function ($user) {
             return in_array($user->role, ['admin', 'registry_staff'], true);
         });

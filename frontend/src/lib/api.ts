@@ -25,6 +25,26 @@ export type User = {
   department: Pick<Department, "id" | "name"> | null;
 };
 
+export const USER_ROLES = [
+  "admin",
+  "registry_staff",
+  "department_staff",
+  "supervisor",
+] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: "Admin",
+  registry_staff: "Registry Staff",
+  department_staff: "Department Staff",
+  supervisor: "Supervisor",
+};
+
+export function roleLabel(role: string): string {
+  return ROLE_LABELS[role as UserRole] ?? role.replace(/_/g, " ");
+}
+
 export type PhysicalFile = {
   id: number;
   file_number: string;
@@ -74,6 +94,39 @@ export type Notification = {
   metadata: Record<string, unknown> | null;
   read_at: string | null;
   is_read: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Transfer = {
+  id: number;
+  file_id: number;
+  from_department: Pick<Department, "id" | "name"> | null;
+  from_holder: Pick<User, "id" | "name" | "email"> | null;
+  to_department: Pick<Department, "id" | "name"> | null;
+  to_holder: Pick<User, "id" | "name" | "email"> | null;
+  requested_by: Pick<User, "id" | "name" | "email"> | null;
+  requested_at: string | null;
+  status: "pending" | "acknowledged" | "rejected";
+  acknowledged_by: Pick<User, "id" | "name" | "email"> | null;
+  acknowledged_at: string | null;
+  rejected_by: Pick<User, "id" | "name" | "email"> | null;
+  rejected_at: string | null;
+  due_at: string | null;
+  is_overdue: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FileIssue = {
+  id: number;
+  file: Pick<PhysicalFile, "id" | "file_number" | "title"> | null;
+  issue_type: string;
+  description: string;
+  status: "open" | "in_progress" | "resolved" | "dismissed";
+  reported_by: Pick<User, "id" | "name" | "email"> | null;
+  resolved_by: Pick<User, "id" | "name" | "email"> | null;
+  resolved_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -134,6 +187,15 @@ export async function getCurrentUser(token: string) {
   return parseResponse<{ data: User }>(response);
 }
 
+export async function logout(token: string) {
+  const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<{ message: string }>(response);
+}
+
 export async function getDepartments(token: string) {
   const response = await fetch(`${API_BASE_URL}/departments`, {
     headers: authHeaders(token),
@@ -141,6 +203,33 @@ export async function getDepartments(token: string) {
   });
 
   return parseResponse<{ data: Department[] }>(response);
+}
+
+export async function createDepartment(
+  token: string,
+  payload: { name: string; parent_id?: string },
+) {
+  const response = await fetch(`${API_BASE_URL}/departments`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: Department }>(response);
+}
+
+export async function updateDepartment(
+  token: string,
+  id: number,
+  payload: { name: string; parent_id?: string },
+) {
+  const response = await fetch(`${API_BASE_URL}/departments/${id}`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: Department }>(response);
 }
 
 export async function getFileCategories(token: string) {
@@ -159,6 +248,90 @@ export async function getUsers(token: string) {
   });
 
   return parseResponse<{ data: User[] }>(response);
+}
+
+export async function createUser(
+  token: string,
+  payload: {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    role: string;
+    department_id?: string;
+  },
+) {
+  const response = await fetch(`${API_BASE_URL}/users`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: User }>(response);
+}
+
+export async function updateUser(
+  token: string,
+  id: number,
+  payload: {
+    name: string;
+    email: string;
+    role: string;
+    department_id?: string;
+    is_active?: boolean;
+  },
+) {
+  const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: User }>(response);
+}
+
+export async function resetUserPassword(
+  token: string,
+  id: number,
+  payload: { password: string; password_confirmation: string },
+) {
+  const response = await fetch(`${API_BASE_URL}/users/${id}/password`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ message: string }>(response);
+}
+
+export async function updateProfile(
+  token: string,
+  payload: { name: string; email: string },
+) {
+  const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: User }>(response);
+}
+
+export async function changePassword(
+  token: string,
+  payload: {
+    current_password: string;
+    password: string;
+    password_confirmation: string;
+  },
+) {
+  const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ message: string }>(response);
 }
 
 export async function getFiles(
@@ -238,7 +411,7 @@ export async function getNotifications(
   const params = new URLSearchParams();
 
   if (filters.unread !== undefined) {
-    params.set("unread", String(filters.unread));
+    params.set("unread", filters.unread ? "1" : "0");
   }
   if (filters.per_page !== undefined) {
     params.set("per_page", String(filters.per_page));
@@ -277,6 +450,229 @@ export async function markAllNotificationsAsRead(token: string) {
   });
 
   return parseResponse<{ data: { updated: number } }>(response);
+}
+
+export async function getTransfersForFile(token: string, fileId: string) {
+  const response = await fetch(`${API_BASE_URL}/files/${fileId}/transfers`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<{ data: Transfer[] }>(response);
+}
+
+export async function getTransfers(
+  token: string,
+  filters: {
+    status?: string;
+    overdue?: boolean;
+    search?: string;
+    per_page?: number;
+    page?: number;
+  } = {},
+) {
+  const params = new URLSearchParams();
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.overdue !== undefined) {
+    params.set("overdue", filters.overdue ? "1" : "0");
+  }
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+  if (filters.per_page !== undefined) {
+    params.set("per_page", String(filters.per_page));
+  }
+  if (filters.page !== undefined) {
+    params.set("page", String(filters.page));
+  }
+
+  const response = await fetch(`${API_BASE_URL}/transfers?${params.toString()}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<PaginatedResponse<Transfer>>(response);
+}
+
+export async function getOverdueTransfers(
+  token: string,
+  filters: { per_page?: number } = {},
+) {
+  const params = new URLSearchParams();
+
+  if (filters.per_page !== undefined) {
+    params.set("per_page", String(filters.per_page));
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/transfers/overdue?${params.toString()}`,
+    {
+      headers: authHeaders(token),
+      cache: "no-store",
+    },
+  );
+
+  return parseResponse<PaginatedResponse<Transfer>>(response);
+}
+
+export async function getTransfer(token: string, id: string) {
+  const response = await fetch(`${API_BASE_URL}/transfers/${id}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<{ data: Transfer }>(response);
+}
+
+export async function createTransfer(
+  token: string,
+  payload: {
+    file_id: string;
+    to_department_id: string;
+    to_holder_user_id: string;
+    due_at?: string;
+  },
+) {
+  const response = await fetch(`${API_BASE_URL}/transfers`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: Transfer }>(response);
+}
+
+export async function acknowledgeTransfer(token: string, id: string) {
+  const response = await fetch(`${API_BASE_URL}/transfers/${id}/acknowledge`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<{ data: Transfer }>(response);
+}
+
+export async function rejectTransfer(token: string, id: string) {
+  const response = await fetch(`${API_BASE_URL}/transfers/${id}/reject`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<{ data: Transfer }>(response);
+}
+
+export async function getFileIssues(
+  token: string,
+  fileId: string,
+  filters: { per_page?: number } = {},
+) {
+  const params = new URLSearchParams();
+
+  if (filters.per_page !== undefined) {
+    params.set("per_page", String(filters.per_page));
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/files/${fileId}/issues?${params.toString()}`,
+    {
+      headers: authHeaders(token),
+      cache: "no-store",
+    },
+  );
+
+  return parseResponse<PaginatedResponse<FileIssue>>(response);
+}
+
+export async function getIssues(
+  token: string,
+  filters: {
+    status?: string;
+    search?: string;
+    per_page?: number;
+    page?: number;
+  } = {},
+) {
+  const params = new URLSearchParams();
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.search) {
+    params.set("search", filters.search);
+  }
+  if (filters.per_page !== undefined) {
+    params.set("per_page", String(filters.per_page));
+  }
+  if (filters.page !== undefined) {
+    params.set("page", String(filters.page));
+  }
+
+  const response = await fetch(`${API_BASE_URL}/issues?${params.toString()}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<PaginatedResponse<FileIssue>>(response);
+}
+
+export async function getIssue(token: string, id: string) {
+  const response = await fetch(`${API_BASE_URL}/issues/${id}`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  return parseResponse<{ data: FileIssue }>(response);
+}
+
+export async function createIssue(
+  token: string,
+  fileId: string,
+  payload: { issue_type: string; description: string },
+) {
+  const response = await fetch(`${API_BASE_URL}/files/${fileId}/issues`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<{ data: FileIssue }>(response);
+}
+
+export async function updateIssueStatus(
+  token: string,
+  id: string,
+  status: string,
+) {
+  const response = await fetch(`${API_BASE_URL}/issues/${id}`, {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify({ status }),
+  });
+
+  return parseResponse<{ data: FileIssue }>(response);
+}
+
+export type DashboardStats = {
+  totalFiles: number;
+  overdueTransfers: number;
+  unreadNotifications: number;
+};
+
+export async function getDashboardStats(token: string): Promise<DashboardStats> {
+  const [filesResponse, overdueResponse, notificationsResponse] =
+    await Promise.all([
+      getFiles(token, {}),
+      getOverdueTransfers(token, { per_page: 1 }),
+      getNotifications(token, { unread: true, per_page: 1 }),
+    ]);
+
+  return {
+    totalFiles: filesResponse.meta.total,
+    overdueTransfers: overdueResponse.meta.total,
+    unreadNotifications: notificationsResponse.meta.total,
+  };
 }
 
 export async function createFile(

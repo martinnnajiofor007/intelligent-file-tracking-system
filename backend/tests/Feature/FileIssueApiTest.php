@@ -197,6 +197,18 @@ class FileIssueApiTest extends TestCase
             ->assertJsonPath('meta.last_page', 3);
     }
 
+    public function test_file_issue_list_caps_per_page_at_100(): void
+    {
+        $file = $this->makeFile();
+        FileIssue::factory()->count(3)->create(['file_id' => $file->id]);
+
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson("/api/files/{$file->id}/issues?per_page=999999")
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', 100);
+    }
+
     // ---------- Status changes ----------
 
     public function test_authorized_user_can_change_status(): void

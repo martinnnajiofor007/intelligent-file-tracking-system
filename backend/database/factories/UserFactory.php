@@ -45,6 +45,11 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => ['role' => 'supervisor']);
     }
 
+    public function departmentStaff()
+    {
+        return $this->state(fn (array $attributes) => ['role' => 'department_staff']);
+    }
+
     /**
      * Indicate that the model's email address should be unverified.
      *

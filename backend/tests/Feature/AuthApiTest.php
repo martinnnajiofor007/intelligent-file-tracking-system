@@ -59,4 +59,24 @@ class AuthApiTest extends TestCase
     {
         $this->getJson('/api/files')->assertUnauthorized();
     }
+
+    public function test_login_is_rate_limited(): void
+    {
+        User::factory()->create([
+            'email' => 'admin@example.com',
+            'password' => Hash::make('password'),
+        ]);
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'admin@example.com',
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'admin@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+    }
 }

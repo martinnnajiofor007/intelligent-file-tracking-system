@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IndexIssueRequest;
 use App\Http\Requests\StoreFileIssueRequest;
 use App\Http\Requests\UpdateFileIssueRequest;
 use App\Models\File;
@@ -43,7 +44,33 @@ class FileIssueController extends Controller
         $issues = $file->issues()
             ->with($this->relations())
             ->orderByDesc('created_at')
-            ->paginate((int) $request->input('per_page', 15));
+            ->paginate($this->perPage($request));
+
+        return response()->json([
+            'data' => $issues->getCollection()->map(fn (FileIssue $issue) => $this->serializeIssue($issue))->values(),
+            'meta' => [
+                'current_page' => $issues->currentPage(),
+                'per_page' => $issues->perPage(),
+                'total' => $issues->total(),
+                'last_page' => $issues->lastPage(),
+            ],
+        ]);
+    }
+
+    public function indexAll(IndexIssueRequest $request): JsonResponse
+    {
+        $issues = FileIssue::query()
+            ->with($this->relations())
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->input('status')))
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->input('search');
+                $query->whereHas('file', function ($fileQuery) use ($search) {
+                    $fileQuery->where('file_number', 'like', "%{$search}%")
+                        ->orWhere('title', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('created_at')
+            ->paginate($this->perPage($request));
 
         return response()->json([
             'data' => $issues->getCollection()->map(fn (FileIssue $issue) => $this->serializeIssue($issue))->values(),
@@ -78,6 +105,11 @@ class FileIssueController extends Controller
             'reportedBy',
             'resolvedBy',
         ];
+    }
+
+    private function perPage(Request $request): int
+    {
+        return max(1, min((int) $request->input('per_page', 15), 100));
     }
 
     private function serializeIssue(FileIssue $issue): array

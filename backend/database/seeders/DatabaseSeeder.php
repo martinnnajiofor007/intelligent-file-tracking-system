@@ -2,10 +2,17 @@
 
 namespace Database\Seeders;
 
+use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\File;
 use App\Models\FileCategory;
+use App\Models\FileIssue;
+use App\Models\Transfer;
 use App\Models\User;
+use App\Services\AuditLogService;
+use App\Services\FileIssueService;
+use App\Services\NotificationService;
+use App\Services\TransferService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Seeder;
 
@@ -120,21 +127,169 @@ class DatabaseSeeder extends Seeder
         ])->each(function (array $file) use ($categories, $departments, $users, $registryUser) {
             [$fileNumber, $title, $category, $department, $holderEmail] = $file;
 
-            File::updateOrCreate(
-                ['file_number' => $fileNumber],
-                [
-                    'title' => $title,
-                    'description' => "Initial registered physical file for {$title}.",
-                    'category_id' => $categories[$category]->id,
-                    'confirmed_department_id' => $departments[$department]->id,
-                    'confirmed_holder_user_id' => $users[$holderEmail]->id,
-                    'status' => File::STATUS_ACTIVE,
-                    'registered_by_user_id' => $registryUser->id,
-                    'registered_at' => now(),
-                ]
-            );
+            // Only create the file if it does not already exist. This preserves
+            // confirmed custody changes made by acknowledged transfers when the
+            // seeder is re-run.
+            if (File::where('file_number', $fileNumber)->exists()) {
+                return;
+            }
+
+            File::create([
+                'file_number' => $fileNumber,
+                'title' => $title,
+                'description' => "Initial registered physical file for {$title}.",
+                'category_id' => $categories[$category]->id,
+                'confirmed_department_id' => $departments[$department]->id,
+                'confirmed_holder_user_id' => $users[$holderEmail]->id,
+                'status' => File::STATUS_ACTIVE,
+                'registered_by_user_id' => $registryUser->id,
+                'registered_at' => now(),
+            ]);
         });
 
+        $this->seedTransfers($users, $departments);
+        $this->seedIssues($users, $admin);
+        $this->seedFileAuditLogs($registryUser);
+
         $admin->tokens()->delete();
+    }
+
+    /**
+     * Seed transfers in different states, including one overdue transfer.
+     * Uses the TransferService so audit logs and notifications are generated
+     * consistently with the application's business rules.
+     */
+    private function seedTransfers($users, $departments): void
+    {
+        $transfers = app(TransferService::class);
+        $notifications = app(NotificationService::class);
+
+        $fileByNumber = fn (string $number) => File::where('file_number', $number)->first();
+
+        // 1. Pending transfer (not overdue).
+        $pendingFile = $fileByNumber('REG/2026/001');
+        if ($pendingFile && ! Transfer::where('file_id', $pendingFile->id)
+            ->where('to_holder_user_id', $users['finance@example.com']->id)
+            ->exists()) {
+            $transfers->create($users['registry@example.com'], $pendingFile, [
+                'to_department_id' => $departments['Finance']->id,
+                'to_holder_user_id' => $users['finance@example.com']->id,
+            ]);
+        }
+
+        // 2. Overdue transfer (due date in the past).
+        $overdueFile = $fileByNumber('FIN/2026/002');
+        if ($overdueFile && ! Transfer::where('file_id', $overdueFile->id)
+            ->where('to_holder_user_id', $users['procurement@example.com']->id)
+            ->exists()) {
+            $transfer = $transfers->create($users['supervisor@example.com'], $overdueFile, [
+                'to_department_id' => $departments['Procurement']->id,
+                'to_holder_user_id' => $users['procurement@example.com']->id,
+            ]);
+            $transfer->update(['due_at' => now()->subDays(3)]);
+            $notifications->notifyTransferOverdue($transfer->fresh());
+        }
+
+        // 3. Acknowledged transfer (moves confirmed custody to the destination).
+        $ackFile = $fileByNumber('HR/2026/003');
+        if ($ackFile && ! Transfer::where('file_id', $ackFile->id)
+            ->where('to_holder_user_id', $users['legal@example.com']->id)
+            ->exists()) {
+            $transfer = $transfers->create($users['registry@example.com'], $ackFile, [
+                'to_department_id' => $departments['Legal']->id,
+                'to_holder_user_id' => $users['legal@example.com']->id,
+            ]);
+            $transfers->acknowledge($users['legal@example.com'], $transfer);
+        }
+
+        // 4. Rejected transfer (custody is never modified).
+        $rejectedFile = $fileByNumber('PROC/2026/004');
+        if ($rejectedFile && ! Transfer::where('file_id', $rejectedFile->id)
+            ->where('to_holder_user_id', $users['finance@example.com']->id)
+            ->exists()) {
+            $transfer = $transfers->create($users['registry@example.com'], $rejectedFile, [
+                'to_department_id' => $departments['Finance']->id,
+                'to_holder_user_id' => $users['finance@example.com']->id,
+            ]);
+            $transfers->reject($users['finance@example.com'], $transfer);
+        }
+    }
+
+    /**
+     * Seed file issues in different states. Uses the FileIssueService so audit
+     * logs and notifications are generated consistently.
+     */
+    private function seedIssues($users, $admin): void
+    {
+        $issues = app(FileIssueService::class);
+
+        $fileByNumber = fn (string $number) => File::where('file_number', $number)->first();
+
+        // 1. Open issue.
+        $openFile = $fileByNumber('LEG/2026/005');
+        if ($openFile && ! FileIssue::where('file_id', $openFile->id)
+            ->where('issue_type', 'damage')
+            ->exists()) {
+            $issues->create($users['legal@example.com'], $openFile, [
+                'issue_type' => 'damage',
+                'description' => 'The physical file cover is torn and several pages show water damage.',
+            ]);
+        }
+
+        // 2. In-progress issue.
+        $inProgressFile = $fileByNumber('FIN/2026/007');
+        if ($inProgressFile && ! FileIssue::where('file_id', $inProgressFile->id)
+            ->where('issue_type', 'missing_document')
+            ->exists()) {
+            $issue = $issues->create($users['finance@example.com'], $inProgressFile, [
+                'issue_type' => 'missing_document',
+                'description' => 'One supporting document referenced in the file index is missing.',
+            ]);
+            $issues->updateStatus($users['supervisor@example.com'], $issue, FileIssue::STATUS_IN_PROGRESS);
+        }
+
+        // 3. Resolved issue.
+        $resolvedFile = $fileByNumber('HR/2026/008');
+        if ($resolvedFile && ! FileIssue::where('file_id', $resolvedFile->id)
+            ->where('issue_type', 'misplaced')
+            ->exists()) {
+            $issue = $issues->create($users['hr@example.com'], $resolvedFile, [
+                'issue_type' => 'misplaced',
+                'description' => 'The file was temporarily misplaced during a desk move.',
+            ]);
+            $issues->updateStatus($users['supervisor@example.com'], $issue, FileIssue::STATUS_RESOLVED);
+        }
+
+        // 4. Dismissed issue.
+        $dismissedFile = $fileByNumber('PROC/2026/009');
+        if ($dismissedFile && ! FileIssue::where('file_id', $dismissedFile->id)
+            ->where('issue_type', 'duplicate')
+            ->exists()) {
+            $issue = $issues->create($users['procurement@example.com'], $dismissedFile, [
+                'issue_type' => 'duplicate',
+                'description' => 'Reported as a duplicate record; verified as a distinct file.',
+            ]);
+            $issues->updateStatus($admin, $issue, FileIssue::STATUS_DISMISSED);
+        }
+    }
+
+    /**
+     * Record file_created audit events for the seeded files so the audit log
+     * has meaningful history beyond transfer/issue activity.
+     */
+    private function seedFileAuditLogs($registryUser): void
+    {
+        $audit = app(AuditLogService::class);
+
+        File::all()->each(function (File $file) use ($audit, $registryUser) {
+            $exists = AuditLog::where('entity_type', File::class)
+                ->where('entity_id', $file->id)
+                ->where('action', 'file_created')
+                ->exists();
+
+            if (! $exists) {
+                $audit->record($registryUser, 'file_created', File::class, $file->id, null, $file);
+            }
+        });
     }
 }

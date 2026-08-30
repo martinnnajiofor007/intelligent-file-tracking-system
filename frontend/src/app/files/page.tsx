@@ -1,15 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AppShell } from "@/components/AppShell";
+import { AppLink } from "@/components/AppLink";
+import { ProtectedPage } from "@/components/ProtectedPage";
+import { StatusBadge } from "@/components/StatusBadge";
+import { useAuth } from "@/lib/auth";
 import {
   createFile,
-  getCurrentUser,
   getDepartments,
   getFileCategories,
   getFiles,
-  getStoredToken,
   getUsers,
   type Department,
   type FileCategory,
@@ -36,27 +38,17 @@ const emptyForm: FileForm = {
   confirmed_holder_user_id: "",
 };
 
-function subscribeToToken(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getTokenSnapshot(): string | null {
-  return getStoredToken();
-}
-
-function getTokenServerSnapshot(): string | null {
-  return null;
-}
-
 export default function FilesPage() {
-  const router = useRouter();
-  const token = useSyncExternalStore(
-    subscribeToToken,
-    getTokenSnapshot,
-    getTokenServerSnapshot,
+  return (
+    <ProtectedPage>
+      <FilesContent />
+    </ProtectedPage>
   );
-  const [user, setUser] = useState<User | null>(null);
+}
+
+function FilesContent() {
+  const router = useRouter();
+  const { token, user } = useAuth();
   const [files, setFiles] = useState<PhysicalFile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [categories, setCategories] = useState<FileCategory[]>([]);
@@ -79,23 +71,15 @@ export default function FilesPage() {
 
   useEffect(() => {
     if (!token) {
-      router.push("/login");
-    }
-  }, [token, router]);
-
-  useEffect(() => {
-    if (!token) {
       return;
     }
 
     Promise.all([
-      getCurrentUser(token),
       getDepartments(token),
       getFileCategories(token),
       getUsers(token),
     ])
-      .then(([currentUser, departmentResponse, categoryResponse, userResponse]) => {
-        setUser(currentUser.data);
+      .then(([departmentResponse, categoryResponse, userResponse]) => {
         setDepartments(departmentResponse.data);
         setCategories(categoryResponse.data);
         setUsers(userResponse.data);
@@ -152,21 +136,8 @@ export default function FilesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-8 text-slate-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <header className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end">
-          <div>
-            <p className="text-sm font-medium text-slate-600">Phase 1</p>
-            <h1 className="mt-1 text-2xl font-semibold">Physical Files</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Register files and view their initial confirmed custodians.
-            </p>
-          </div>
-          <Link href="/" className="text-sm font-medium text-slate-600">
-            Home
-          </Link>
-        </header>
-
+    <AppShell title="Files" subtitle="Register and track physical files">
+      <div className="flex flex-col gap-4">
         {error && (
           <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {error}
@@ -256,15 +227,13 @@ export default function FilesPage() {
                     files.map((file) => (
                       <tr key={file.id} className="border-b border-slate-100">
                         <td className="py-3 pr-4 font-medium">
-                          <Link href={`/files/${file.id}`} className="text-slate-950">
+                          <AppLink href={`/files/${file.id}`}>
                             {file.file_number}
-                          </Link>
+                          </AppLink>
                         </td>
                         <td className="py-3 pr-4 text-slate-700">{file.title}</td>
                         <td className="py-3 pr-4">
-                          <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                            {file.status}
-                          </span>
+                          <StatusBadge status={file.status} kind="file" />
                         </td>
                         <td className="py-3 pr-4 text-slate-700">
                           {file.confirmed_department?.name ?? "Unassigned"}
@@ -358,7 +327,7 @@ export default function FilesPage() {
           )}
         </section>
       </div>
-    </main>
+    </AppShell>
   );
 }
 

@@ -14,6 +14,10 @@ class File extends Model
 
     public const STATUS_ACTIVE = 'active';
 
+    public const STATUSES = [
+        self::STATUS_ACTIVE,
+    ];
+
     protected $fillable = [
         'file_number',
         'title',

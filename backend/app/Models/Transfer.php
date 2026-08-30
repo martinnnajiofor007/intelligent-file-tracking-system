@@ -14,6 +14,12 @@ class Transfer extends Model
     public const STATUS_ACKNOWLEDGED = 'acknowledged';
     public const STATUS_REJECTED = 'rejected';
 
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_ACKNOWLEDGED,
+        self::STATUS_REJECTED,
+    ];
+
     protected $fillable = [
         'file_id',
         'from_department_id',

@@ -2,10 +2,11 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { login, storeToken } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("password");
   const [error, setError] = useState<string | null>(null);
@@ -17,9 +18,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await login(email, password);
-      storeToken(response.data.token);
-      router.push("/files");
+      await login(email, password);
+      router.push("/dashboard");
     } catch (error) {
       setError(error instanceof Error ? error.message : "Login failed");
     } finally {
@@ -39,7 +39,7 @@ export default function LoginPage() {
           </p>
           <h1 className="mt-2 text-2xl font-semibold">Sign in</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Use your internal account to access the file registry foundation.
+            Use your internal account to access the file registry.
           </p>
 
           {error && (
@@ -56,6 +56,7 @@ export default function LoginPage() {
               onChange={(event) => setEmail(event.target.value)}
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
               required
+              suppressHydrationWarning
             />
           </label>
 
@@ -67,6 +68,7 @@ export default function LoginPage() {
               onChange={(event) => setPassword(event.target.value)}
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
               required
+              suppressHydrationWarning
             />
           </label>
 
